@@ -1,40 +1,25 @@
 import { assign } from './ployfill';
+import { parseQueryParams, uuid } from './utils';
+import ss from './ss';
 
-const isWindow = typeof window !== 'undefined';
-const isSessionStorage = typeof sessionStorage !== 'undefined';
-
-const keySightScope = '__sight-scope';
+export { parseQueryParams, uuid };
 
 const scope = {};
+const keySightScope = '__sight-scope';
 
-const ss = (): void => {
-  if (isWindow && isSessionStorage) {
-    assign(scope, JSON.parse(sessionStorage.getItem(keySightScope) || '{}'));
-    const search = window.location.search;
-    if (search && search.length > 1) {
-      search
-        .substring(1)
-        .split('&')
-        .map((p) => p.split('='))
-        .forEach(([key, value]) => {
-          scope[key] = value;
-        });
-      sessionStorage.setItem(keySightScope, JSON.stringify(scope));
-    }
-  }
+const sight = (): void => {
+  assign(scope, JSON.parse(ss.getItem(keySightScope) || '{}'));
+  const { search, hash } = window.location;
+  const sh = search || hash;
+  parseQueryParams(search || hash, scope);
+  ss.setItem(keySightScope, JSON.stringify(scope));
 };
 
-if (isWindow) {
+if (typeof addEventListener !== 'undefined') {
   addEventListener('load', () => {
-    ss();
+    sight();
   });
 }
-
-const uuid = () => {
-  return Number(Date.now() * 100 + Math.floor(Math.random() * 100)).toString(
-    36,
-  );
-};
 
 export const get = (key: string): any => {
   return scope[key];
@@ -42,19 +27,15 @@ export const get = (key: string): any => {
 
 export const putPayload = (data: any): string => {
   const payloadId = uuid();
-  if (isWindow && isSessionStorage) {
-    sessionStorage.setItem(`__sight-scope_${payloadId}`, JSON.stringify(data));
-  }
+  ss.setItem(`__sight-scope_${payloadId}`, JSON.stringify(data));
   return payloadId;
 };
 
 export const getPayload = (payloadId: string): any => {
-  if (isWindow && isSessionStorage) {
-    const data = sessionStorage.getItem(`__sight-scope_${payloadId}`);
-    if (data) {
-      return JSON.parse(data);
-    }
+  const data = ss.getItem(`__sight-scope_${payloadId}`);
+  if (data) {
+    return JSON.parse(data);
   }
 };
 
-ss();
+sight();
